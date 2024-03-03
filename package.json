@@ -1,0 +1,27 @@
+{
+  "name": "@yucacodes/ts",
+  "private": false,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "",
+  "module": "src/index.mjs",
+  "scripts": {
+    "test": "jest"
+  },
+  "bin": {
+    "yts": "./src/yts.mjs"
+  },
+  "files": [
+    "src"
+  ],
+  "author": "",
+  "license": "ISC",
+  "peerDependencies": {
+    "typescript": "*"
+  },
+  "devDependencies": {
+    "class-validator": "^0.14.1",
+    "prettier": "^3.2.5",
+    "short-uuid": "4.2.2"
+  }
+}

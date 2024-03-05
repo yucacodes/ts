@@ -6,7 +6,7 @@
   "description": "",
   "module": "src/index.mjs",
   "scripts": {
-    "test": "jest"
+    "test": "node --test"
   },
   "bin": {
     "yts": "./src/yts.mjs"
@@ -20,6 +20,7 @@
     "typescript": "*"
   },
   "devDependencies": {
+    "@types/node": "^20.11.24",
     "class-validator": "^0.14.1",
     "prettier": "^3.2.5",
     "short-uuid": "4.2.2"

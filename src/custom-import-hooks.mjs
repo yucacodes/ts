@@ -4,6 +4,43 @@ import path from 'node:path'
 import ts from 'typescript'
 import { fileURLToPath, pathToFileURL } from 'url'
 
+function resolveTsConfig() {
+  let searchPath = path.resolve(process.cwd())
+
+  const tsconfigPath = path.join(searchPath, 'tsconfig.json')
+  if (fs.existsSync(tsconfigPath)) {
+    return tsconfigPath
+  }
+  return null
+}
+
+function loadTsConfig(path) {
+  try {
+    const raw = fs.readFileSync(path, { encoding: 'utf-8' })
+    return JSON.parse(raw)
+  } catch (e) {
+    return undefined
+  }
+}
+
+const tsConfigPath = resolveTsConfig()
+const userTsConfig = loadTsConfig(tsConfigPath)
+if (userTsConfig) console.info(`Load tsconfig from ${tsConfigPath}`)
+const tsConfig = {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: 'es2015',
+    esModuleInterop: true,
+    experimentalDecorators: true,
+    emitDecoratorMetadata: true,
+    allowJs: true,
+    resolveJsonModule: true,
+    allowSyntheticDefaultImports: true,
+    ...(userTsConfig && userTsConfig.compilerOptions),
+    sourceMap: true,
+  },
+}
+
 const paths = {
   '@framework': path.join(process.cwd(), 'src/framework/index.ts'),
   '@domain': path.join(process.cwd(), 'src/backend/domain/index.ts'),
@@ -60,19 +97,8 @@ export async function load(url, context, nextLoad) {
     const urlPath = fileURLToPath(url)
     const filename = path.basename(urlPath)
     const tsSource = await fsp.readFile(urlPath, { encoding: 'utf-8' })
-    const transpileResult = ts.transpileModule(tsSource, {
-      compilerOptions: {
-        module: ts.ModuleKind.ESNext,
-        target: 'es2015',
-        esModuleInterop: true,
-        experimentalDecorators: true,
-        emitDecoratorMetadata: true,
-        sourceMap: true,
-        allowJs: true,
-        resolveJsonModule: true,
-        allowSyntheticDefaultImports: true,
-      },
-    })
+
+    const transpileResult = ts.transpileModule(tsSource, tsConfig)
     const sourceMap = JSON.parse(transpileResult.sourceMapText)
     sourceMap.file = filename
     sourceMap.sources[0] = `./${filename}`
@@ -80,7 +106,10 @@ export async function load(url, context, nextLoad) {
     source = `${source.substring(0, source.lastIndexOf('\n'))}\n//# sourceMappingURL=data:application/json;base64,${btoa(JSON.stringify(sourceMap))}`
     return {
       shortCircuit: true,
-      format: 'module',
+      format:
+        tsConfig.compilerOptions.module.toString().toLowerCase() === 'commonjs'
+          ? 'commonjs'
+          : 'module',
       source,
     }
   }

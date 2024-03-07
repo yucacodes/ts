@@ -41,28 +41,26 @@ const tsConfig = {
   },
 }
 
-const paths = {
-  '@framework': path.join(process.cwd(), 'src/framework/index.ts'),
-  '@domain': path.join(process.cwd(), 'src/backend/domain/index.ts'),
-  '@application': path.join(process.cwd(), 'src/backend/application/index.ts'),
-  '@presentation': path.join(
-    process.cwd(),
-    'src/backend/presentation/index.ts',
-  ),
-  '@infrastructure': path.join(
-    process.cwd(),
-    'src/backend/infrastructure/index.ts',
-  ),
+const aliasPaths = tsConfig.compilerOptions.paths ?? {}
+
+function resolveAliasPaths(specifier) {
+  if (aliasPaths[specifier]) {
+    return aliasPaths[specifier].map((x) =>
+      path.join(path.resolve(process.cwd()), x),
+    )
+  }
+  return [specifier]
 }
 
 async function resolveTs(specifier, context) {
-  if (paths[specifier]) return pathToFileURL(paths[specifier]).toString()
   if (specifier.startsWith('file://')) return null
-  if (!specifier.startsWith('.') && !specifier.startsWith('/')) {
+  if (!specifier.startsWith('.') && !path.isAbsolute(specifier)) {
     return null
   }
   const parentPath = fileURLToPath(context.parentURL)
-  let specifierPath = path.join(path.dirname(parentPath), specifier)
+  let specifierPath = path.isAbsolute(specifier)
+    ? specifier
+    : path.join(path.dirname(parentPath), specifier)
 
   const isDirectory =
     fs.existsSync(specifierPath) && fs.statSync(specifierPath).isDirectory()
@@ -82,11 +80,14 @@ async function resolveTs(specifier, context) {
 }
 
 export async function resolve(specifier, context, nextResolve) {
-  const tsFileUrl = await resolveTs(specifier, context)
-  if (tsFileUrl) {
-    return {
-      shortCircuit: true,
-      url: tsFileUrl,
+  const resolvedSpecifiers = resolveAliasPaths(specifier)
+  for (const rs of resolvedSpecifiers) {
+    const tsFileUrl = await resolveTs(rs, context)
+    if (tsFileUrl) {
+      return {
+        shortCircuit: true,
+        url: tsFileUrl,
+      }
     }
   }
   return nextResolve(specifier)

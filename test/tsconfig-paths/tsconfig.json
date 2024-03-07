@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "ESNext",
     "paths": {
-      "app/*": ["./src/app/*"],
-      "config/*": ["./src/app/_config/*"],
+      "tsfile": ["../../test.assets/ts-file"],
+      "tsdir": ["../../test.assets/ts-dir"],
       "environment/*": ["./src/environments/*"],
       "shared/*": ["./src/app/_shared/*"],
       "helpers/*": ["./src/helpers/*"],

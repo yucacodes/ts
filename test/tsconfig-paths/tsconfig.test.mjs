@@ -12,3 +12,9 @@ test('tsconfig exact path to ts dir', async () => {
     cwd: 'test/tsconfig-paths',
   })
 })
+
+test('tsconfig wilcard path to ts dir', async () => {
+  await execTsFile('test/tsconfig-paths/3.wilcard-path-to-ts-dir.ts', {
+    cwd: 'test/tsconfig-paths',
+  })
+})

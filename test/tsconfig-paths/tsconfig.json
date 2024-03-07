@@ -4,10 +4,7 @@
     "paths": {
       "tsfile": ["../../test.assets/ts-file"],
       "tsdir": ["../../test.assets/ts-dir"],
-      "environment/*": ["./src/environments/*"],
-      "shared/*": ["./src/app/_shared/*"],
-      "helpers/*": ["./src/helpers/*"],
-      "tests/*": ["./src/tests/*"]
+      "tsdir/*": ["../../test.assets/ts-dir/*"]
     }
   }
 }

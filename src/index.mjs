@@ -1,9 +1,10 @@
 import { spawn } from 'child_process'
 import * as path from 'path'
+import { fileURLToPath, pathToFileURL } from 'url'
 
 const nodejs = process.execPath
-const __dirname = new URL('.', import.meta.url).pathname
-const customImport = path.join(__dirname, './custom-import.mjs')
+const __dirname = fileURLToPath(new URL('.', import.meta.url).toString())
+const customImport = pathToFileURL(path.join(__dirname, './custom-import.mjs')).toString()
 
 const child = spawn(nodejs, [
   '--import',

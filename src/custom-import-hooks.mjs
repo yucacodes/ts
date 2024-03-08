@@ -48,6 +48,23 @@ function resolveAliasPaths(specifier) {
     return aliasPaths[specifier].map((x) =>
       path.join(path.resolve(process.cwd()), x),
     )
+  } else {
+    for (const alias in aliasPaths) {
+      if (!alias.endsWith('/*')) {
+        continue
+      }
+      const aliasPrefix = alias.slice(0, -1)
+      if (specifier.startsWith(aliasPrefix)) {
+        return aliasPaths[alias]
+          .filter((x) => x.endsWith('/*'))
+          .map((x) =>
+            path.join(
+              path.resolve(process.cwd()),
+              x.slice(0, -1) + specifier.substring(aliasPrefix.length),
+            ),
+          )
+      }
+    }
   }
   return [specifier]
 }

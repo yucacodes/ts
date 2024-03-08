@@ -40,6 +40,7 @@ const tsConfig = {
     sourceMap: true,
   },
 }
+tsConfig.compilerOptions.jsx = undefined
 
 const aliasPaths = tsConfig.compilerOptions.paths ?? {}
 

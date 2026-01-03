@@ -25,7 +25,7 @@ function loadTsConfig(path) {
 
 const tsConfigPath = resolveTsConfig()
 const userTsConfig = loadTsConfig(tsConfigPath)
-if (userTsConfig) console.info(`Load tsconfig from ${tsConfigPath}`)
+
 const tsConfig = {
   compilerOptions: {
     module: ts.ModuleKind.ESNext,

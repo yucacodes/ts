@@ -3,7 +3,22 @@
   "private": false,
   "version": "0.0.6",
   "type": "module",
-  "description": "",
+  "description": "Lightweight TypeScript runtime loader for Node.js using custom import hooks",
+  "keywords": [
+    "typescript",
+    "ts",
+    "runtime",
+    "loader",
+    "import-hooks",
+    "transpiler",
+    "tsconfig",
+    "path-aliases",
+    "esm",
+    "nodejs",
+    "typescript-runner",
+    "ts-node",
+    "on-the-fly"
+  ],
   "module": "src/custom-import.mjs",
   "main": "src/custom-import.mjs",
   "scripts": {
@@ -17,6 +32,14 @@
   ],
   "author": "",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yucacodes/ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yucacodes/ts/issues"
+  },
+  "homepage": "https://github.com/yucacodes/ts#readme",
   "peerDependencies": {
     "typescript": "*"
   },

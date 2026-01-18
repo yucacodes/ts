@@ -1,10 +1,11 @@
 {
   "name": "@yucacodes/ts",
   "private": false,
-  "version": "0.0.5",
+  "version": "0.0.6",
   "type": "module",
   "description": "",
   "module": "src/custom-import.mjs",
+  "main": "src/custom-import.mjs",
   "scripts": {
     "test": "node --test"
   },

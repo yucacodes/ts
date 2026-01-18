@@ -44,31 +44,62 @@ tsConfig.compilerOptions.jsx = undefined
 
 const aliasPaths = tsConfig.compilerOptions.paths ?? {}
 
-function resolveAliasPaths(specifier) {
-  if (aliasPaths[specifier]) {
-    return aliasPaths[specifier].map((x) =>
-      path.join(path.resolve(process.cwd()), x),
-    )
+// Cache for resolved alias paths
+const aliasCache = new Map()
+const cwdResolved = path.resolve(process.cwd())
+
+// Pre-process aliases for faster lookups
+const exactAliases = new Map()
+const wildcardAliases = []
+
+for (const alias in aliasPaths) {
+  if (alias.endsWith('/*')) {
+    const aliasPrefix = alias.slice(0, -1)
+    const paths = aliasPaths[alias]
+      .filter((x) => x.endsWith('/*'))
+      .map((x) => x.slice(0, -1))
+    wildcardAliases.push({ prefix: aliasPrefix, paths })
   } else {
-    for (const alias in aliasPaths) {
-      if (!alias.endsWith('/*')) {
-        continue
-      }
-      const aliasPrefix = alias.slice(0, -1)
-      if (specifier.startsWith(aliasPrefix)) {
-        return aliasPaths[alias]
-          .filter((x) => x.endsWith('/*'))
-          .map((x) =>
-            path.join(
-              path.resolve(process.cwd()),
-              x.slice(0, -1) + specifier.substring(aliasPrefix.length),
-            ),
-          )
+    exactAliases.set(
+      alias,
+      aliasPaths[alias].map((x) => path.join(cwdResolved, x)),
+    )
+  }
+}
+
+function resolveAliasPaths(specifier) {
+  // Check cache first
+  const cached = aliasCache.get(specifier)
+  if (cached) return cached
+
+  let result
+  // Check exact match first
+  if (exactAliases.has(specifier)) {
+    result = exactAliases.get(specifier)
+  } else {
+    // Check wildcard aliases
+    for (const { prefix, paths } of wildcardAliases) {
+      if (specifier.startsWith(prefix)) {
+        const suffix = specifier.substring(prefix.length)
+        result = paths.map((p) => path.join(cwdResolved, p + suffix))
+        break
       }
     }
   }
-  return [specifier]
+
+  if (!result) {
+    result = [specifier]
+  }
+
+  // Cache the result
+  aliasCache.set(specifier, result)
+  return result
 }
+
+// Cache for resolved TypeScript file URLs
+const resolveTsCache = new Map()
+// Set of JS extensions to skip
+const jsExtensions = new Set(['js', 'cjs', 'mjs'])
 
 async function resolveTs(specifier, context) {
   if (specifier.startsWith('file://')) return null
@@ -80,20 +111,42 @@ async function resolveTs(specifier, context) {
     ? specifier
     : path.join(path.dirname(parentPath), specifier)
 
-  const isDirectory =
-    fs.existsSync(specifierPath) && fs.statSync(specifierPath).isDirectory()
-  const extension = path.basename(specifier).split('.').at(-1)
-  if (['js', 'cjs', 'mjs'].includes(extension) && !isDirectory) {
+  // Check cache
+  const cacheKey = specifierPath
+  const cached = resolveTsCache.get(cacheKey)
+  if (cached !== undefined) return cached
+
+  // Quick extension check before fs calls
+  const extension = path.extname(specifier).slice(1)
+  if (jsExtensions.has(extension)) {
+    resolveTsCache.set(cacheKey, null)
     return null
   }
-  if (fs.existsSync(specifierPath + '.ts')) {
-    return pathToFileURL(specifierPath + '.ts').toString()
-  } else if (isDirectory) {
-    const indexPath = path.join(specifierPath, 'index.ts')
-    if (fs.existsSync(indexPath)) {
-      return pathToFileURL(indexPath).toString()
-    }
+
+  // Try .ts file first (most common case)
+  const tsPath = specifierPath + '.ts'
+  if (fs.existsSync(tsPath)) {
+    const result = pathToFileURL(tsPath).toString()
+    resolveTsCache.set(cacheKey, result)
+    return result
   }
+
+  // Check if directory and try index.ts
+  try {
+    const stats = fs.statSync(specifierPath)
+    if (stats.isDirectory()) {
+      const indexPath = path.join(specifierPath, 'index.ts')
+      if (fs.existsSync(indexPath)) {
+        const result = pathToFileURL(indexPath).toString()
+        resolveTsCache.set(cacheKey, result)
+        return result
+      }
+    }
+  } catch {
+    // Path doesn't exist, not an error
+  }
+
+  resolveTsCache.set(cacheKey, null)
   return null
 }
 
@@ -111,9 +164,31 @@ export async function resolve(specifier, context, nextResolve) {
   return nextResolve(specifier)
 }
 
+// Cache for transpiled modules with file modification time
+const transpileCache = new Map()
+// Pre-compute the format to avoid repeated toString() and toLowerCase()
+const moduleFormat =
+  tsConfig.compilerOptions.module.toString().toLowerCase() === 'commonjs'
+    ? 'commonjs'
+    : 'module'
+
 export async function load(url, context, nextLoad) {
   if (url.startsWith('file://') && url.endsWith('.ts')) {
     const urlPath = fileURLToPath(url)
+
+    // Check cache with mtime validation
+    let stats
+    try {
+      stats = await fsp.stat(urlPath)
+      const cached = transpileCache.get(urlPath)
+      if (cached && cached.mtime >= stats.mtimeMs) {
+        return cached.result
+      }
+    } catch {
+      // File doesn't exist or stat failed
+      return nextLoad(url)
+    }
+
     const filename = path.basename(urlPath)
     const tsSource = await fsp.readFile(urlPath, { encoding: 'utf-8' })
 
@@ -121,16 +196,26 @@ export async function load(url, context, nextLoad) {
     const sourceMap = JSON.parse(transpileResult.sourceMapText)
     sourceMap.file = filename
     sourceMap.sources[0] = `./${filename}`
-    let source = transpileResult.outputText
-    source = `${source.substring(0, source.lastIndexOf('\n'))}\n//# sourceMappingURL=data:application/json;base64,${btoa(JSON.stringify(sourceMap))}`
-    return {
+
+    // Pre-compute the base64 source map
+    const sourceMapBase64 = Buffer.from(
+      JSON.stringify(sourceMap),
+      'utf-8',
+    ).toString('base64')
+
+    const lastNewline = transpileResult.outputText.lastIndexOf('\n')
+    const source = `${transpileResult.outputText.substring(0, lastNewline)}\n//# sourceMappingURL=data:application/json;base64,${sourceMapBase64}`
+
+    const result = {
       shortCircuit: true,
-      format:
-        tsConfig.compilerOptions.module.toString().toLowerCase() === 'commonjs'
-          ? 'commonjs'
-          : 'module',
+      format: moduleFormat,
       source,
     }
+
+    // Cache the result with modification time
+    transpileCache.set(urlPath, { mtime: stats.mtimeMs, result })
+
+    return result
   }
   return nextLoad(url)
 }

@@ -4,51 +4,53 @@ import path from 'node:path'
 import ts from 'typescript'
 import { fileURLToPath, pathToFileURL } from 'url'
 
-function resolveTsConfig() {
-  let searchPath = path.resolve(process.cwd())
-
-  const tsconfigPath = path.join(searchPath, 'tsconfig.json')
-  if (fs.existsSync(tsconfigPath)) {
-    return tsconfigPath
+function loadTsConfig() {
+  const cwd = path.resolve(process.cwd())
+  const configPath = ts.findConfigFile(cwd, ts.sys.fileExists, 'tsconfig.json')
+  if (!configPath) {
+    return { options: {}, configDir: cwd }
   }
-  return null
-}
 
-function loadTsConfig(path) {
-  try {
-    const raw = fs.readFileSync(path, { encoding: 'utf-8' })
-    return JSON.parse(raw)
-  } catch (e) {
-    return undefined
+  const readResult = ts.readConfigFile(configPath, ts.sys.readFile)
+  if (readResult.error || !readResult.config) {
+    return { options: {}, configDir: cwd }
   }
+
+  const configDir = path.dirname(configPath)
+  const parsed = ts.parseJsonConfigFileContent(
+    readResult.config,
+    ts.sys,
+    configDir,
+  )
+  return { options: parsed.options ?? {}, configDir }
 }
 
-const tsConfigPath = resolveTsConfig()
-const userTsConfig = loadTsConfig(tsConfigPath)
+const { options: userOptions, configDir } = loadTsConfig()
 
-const tsConfig = {
-  compilerOptions: {
-    module: ts.ModuleKind.ESNext,
-    target: 'es2015',
-    esModuleInterop: true,
-    experimentalDecorators: true,
-    emitDecoratorMetadata: true,
-    allowJs: true,
-    resolveJsonModule: true,
-    allowSyntheticDefaultImports: true,
-    ...(userTsConfig && userTsConfig.compilerOptions),
-    sourceMap: true,
-  },
+const compilerOptions = {
+  module: ts.ModuleKind.ESNext,
+  target: ts.ScriptTarget.ES2015,
+  esModuleInterop: true,
+  experimentalDecorators: true,
+  emitDecoratorMetadata: true,
+  allowJs: true,
+  resolveJsonModule: true,
+  allowSyntheticDefaultImports: true,
+  ...userOptions,
+  sourceMap: true,
+  jsx: undefined,
 }
-tsConfig.compilerOptions.jsx = undefined
 
-const aliasPaths = tsConfig.compilerOptions.paths ?? {}
+const aliasPaths = compilerOptions.paths ?? {}
+// TS 6.0 deprecates `baseUrl` as a paths base; paths now resolve relative to
+// the tsconfig directory. We still honor `baseUrl` if explicitly set, to keep
+// pre-6.0 configs working.
+const pathsBase = compilerOptions.baseUrl
+  ? path.resolve(configDir, compilerOptions.baseUrl)
+  : configDir
 
-// Cache for resolved alias paths
 const aliasCache = new Map()
-const cwdResolved = path.resolve(process.cwd())
 
-// Pre-process aliases for faster lookups
 const exactAliases = new Map()
 const wildcardAliases = []
 
@@ -62,7 +64,7 @@ for (const alias in aliasPaths) {
   } else {
     exactAliases.set(
       alias,
-      aliasPaths[alias].map((x) => path.join(cwdResolved, x)),
+      aliasPaths[alias].map((x) => path.resolve(pathsBase, x)),
     )
   }
 }
@@ -81,7 +83,7 @@ function resolveAliasPaths(specifier) {
     for (const { prefix, paths } of wildcardAliases) {
       if (specifier.startsWith(prefix)) {
         const suffix = specifier.substring(prefix.length)
-        result = paths.map((p) => path.join(cwdResolved, p + suffix))
+        result = paths.map((p) => path.resolve(pathsBase, p + suffix))
         break
       }
     }
@@ -166,11 +168,9 @@ export async function resolve(specifier, context, nextResolve) {
 
 // Cache for transpiled modules with file modification time
 const transpileCache = new Map()
-// Pre-compute the format to avoid repeated toString() and toLowerCase()
 const moduleFormat =
-  tsConfig.compilerOptions.module.toString().toLowerCase() === 'commonjs'
-    ? 'commonjs'
-    : 'module'
+  compilerOptions.module === ts.ModuleKind.CommonJS ? 'commonjs' : 'module'
+const tsConfig = { compilerOptions }
 
 export async function load(url, context, nextLoad) {
   if (url.startsWith('file://') && url.endsWith('.ts')) {

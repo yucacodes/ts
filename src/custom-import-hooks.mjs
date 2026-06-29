@@ -38,7 +38,10 @@ const compilerOptions = {
   allowSyntheticDefaultImports: true,
   ...userOptions,
   sourceMap: true,
-  jsx: undefined,
+  jsx: userOptions.jsx ?? ts.JsxEmit.ReactJSX,
+  jsxImportSource: userOptions.jsxImportSource,
+  jsxFactory: userOptions.jsxFactory,
+  jsxFragmentFactory: userOptions.jsxFragmentFactory,
 }
 
 const aliasPaths = compilerOptions.paths ?? {}
@@ -102,6 +105,12 @@ function resolveAliasPaths(specifier) {
 const resolveTsCache = new Map()
 // Set of JS extensions to skip
 const jsExtensions = new Set(['js', 'cjs', 'mjs'])
+// TypeScript/JSX extensions we can resolve when present on the specifier
+const tsExtensions = new Set(['ts', 'tsx', 'jsx', 'mts', 'cts'])
+// Extensions to probe (in order) when the specifier has no extension
+const resolveExtensions = ['.ts', '.tsx', '.jsx', '.mts', '.cts']
+// Directory index files to probe (in order)
+const indexFiles = ['index.ts', 'index.tsx', 'index.jsx']
 
 async function resolveTs(specifier, context) {
   if (specifier.startsWith('file://')) return null
@@ -125,23 +134,34 @@ async function resolveTs(specifier, context) {
     return null
   }
 
-  // Try .ts file first (most common case)
-  const tsPath = specifierPath + '.ts'
-  if (fs.existsSync(tsPath)) {
-    const result = pathToFileURL(tsPath).toString()
+  // 1. Specifier as-is if it already has a resolvable extension
+  if (tsExtensions.has(extension) && fs.existsSync(specifierPath)) {
+    const result = pathToFileURL(specifierPath).toString()
     resolveTsCache.set(cacheKey, result)
     return result
   }
 
-  // Check if directory and try index.ts
+  // 2. Probe known TypeScript/JSX extensions (.ts is the most common case)
+  for (const ext of resolveExtensions) {
+    const candidate = specifierPath + ext
+    if (fs.existsSync(candidate)) {
+      const result = pathToFileURL(candidate).toString()
+      resolveTsCache.set(cacheKey, result)
+      return result
+    }
+  }
+
+  // 3. Check if directory and try its index variants
   try {
     const stats = fs.statSync(specifierPath)
     if (stats.isDirectory()) {
-      const indexPath = path.join(specifierPath, 'index.ts')
-      if (fs.existsSync(indexPath)) {
-        const result = pathToFileURL(indexPath).toString()
-        resolveTsCache.set(cacheKey, result)
-        return result
+      for (const indexFile of indexFiles) {
+        const indexPath = path.join(specifierPath, indexFile)
+        if (fs.existsSync(indexPath)) {
+          const result = pathToFileURL(indexPath).toString()
+          resolveTsCache.set(cacheKey, result)
+          return result
+        }
       }
     }
   } catch {
@@ -173,7 +193,7 @@ const moduleFormat =
 const tsConfig = { compilerOptions }
 
 export async function load(url, context, nextLoad) {
-  if (url.startsWith('file://') && url.endsWith('.ts')) {
+  if (url.startsWith('file://') && /\.(ts|tsx|jsx|mts|cts)$/.test(url)) {
     const urlPath = fileURLToPath(url)
 
     // Check cache with mtime validation

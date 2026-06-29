@@ -1,10 +1,12 @@
 # @yucacodes/ts
 
-A lightweight TypeScript runtime loader for Node.js using custom import hooks. Run TypeScript files directly without pre-compilation.
+A lightweight TypeScript runtime loader for Node.js using custom import hooks. Run TypeScript and JSX files directly without pre-compilation.
 
 ## Features
 
-- **Direct execution** - Run `.ts` files without building
+- **Direct execution** - Run `.ts`, `.tsx`, `.jsx`, `.mts`, and `.cts` files without building
+- **JSX support** - Transpiles JSX, honoring your tsconfig `jsx` settings (defaults to the automatic runtime)
+- **Decorator metadata** - Emits `design:paramtypes` via the real TypeScript compiler, so dependency-injection frameworks keep working
 - **tsconfig.json support** - Automatically loads and applies your TypeScript configuration
 - **Path aliases** - Full support for `paths` in tsconfig.json (exact matches and wildcards)
 - **Fast resolution** - Optimized with caching for alias paths and transpiled modules
@@ -57,6 +59,27 @@ The loader will automatically:
 - Apply your compiler options
 - Resolve path aliases
 
+### JSX
+
+JSX is enabled by default using the automatic runtime (`react-jsx`). Point it at
+your renderer with `jsxImportSource`:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  }
+}
+```
+
+`jsx`, `jsxImportSource`, `jsxFactory`, and `jsxFragmentFactory` are all read
+from your `tsconfig.json`. Then run `.tsx`/`.jsx` files directly:
+
+```bash
+yts your-component.tsx
+```
+
 ## How It Works
 
 The package uses Node.js [custom import hooks](https://nodejs.org/api/module.html#customization-hooks) to:
@@ -68,7 +91,9 @@ The package uses Node.js [custom import hooks](https://nodejs.org/api/module.htm
 
 ## Supported Features
 
-- TypeScript transpilation (`.ts` files)
+- TypeScript transpilation (`.ts`, `.tsx`, `.jsx`, `.mts`, `.cts` files)
+- JSX transpilation (automatic, classic, or custom factory via tsconfig)
+- Decorator metadata emission (`experimentalDecorators` + `emitDecoratorMetadata`)
 - Path alias resolution (exact and wildcard patterns)
 - CommonJS and ESM module imports
 - JSON imports

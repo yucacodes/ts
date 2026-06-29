@@ -1,7 +1,7 @@
 {
   "name": "@yucacodes/ts",
   "private": false,
-  "version": "0.0.8",
+  "version": "0.1.0",
   "type": "module",
   "description": "Lightweight TypeScript runtime loader for Node.js using custom import hooks",
   "keywords": [
@@ -46,6 +46,7 @@
   "devDependencies": {
     "@types/node": "^20.11.24",
     "class-validator": "^0.14.1",
+    "preact": "^10.29.3",
     "prettier": "^3.2.5",
     "short-uuid": "4.2.2"
   }

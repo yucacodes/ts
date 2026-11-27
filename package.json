@@ -1,7 +1,7 @@
 {
   "name": "@yucacodes/ts",
   "private": false,
-  "version": "0.0.7",
+  "version": "0.2.0",
   "type": "module",
   "description": "Lightweight TypeScript runtime loader for Node.js using custom import hooks",
   "keywords": [
@@ -22,7 +22,7 @@
   "module": "src/custom-import.mjs",
   "main": "src/custom-import.mjs",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test test/*/*.test.mjs"
   },
   "bin": {
     "yts": "src/yts.mjs"
@@ -46,7 +46,10 @@
   "devDependencies": {
     "@types/node": "^20.11.24",
     "class-validator": "^0.14.1",
+    "preact": "^10.29.3",
     "prettier": "^3.2.5",
-    "short-uuid": "4.2.2"
+    "short-uuid": "4.2.2",
+    "typescript": "^7.0.2",
+    "typescript6": "npm:typescript@^6.0.3"
   }
 }

@@ -1,2 +1,2 @@
-import obj from '../../test.assets/json-file.json' assert { type: 'json' }
+import obj from '../../test.assets/json-file.json' with { type: 'json' }
 console.log(JSON.stringify(obj))
